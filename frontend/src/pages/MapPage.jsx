@@ -1,0 +1,422 @@
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { FaMapMarkerAlt, FaRoute, FaClock } from "react-icons/fa";
+import { reverseGeocode } from "../api/locationApi";
+import Navbar from "../components/Navbar";
+import MapComponent from "../components/MapComponent";
+import ServiceCard from "../components/ServiceCard";
+import SOSButton from "../components/SOSButton";
+import { useAuth } from "../context/AuthContext";
+import getCurrentLocation from "../utils/getCurrentLocation";
+import {
+  getShortestRoute,
+} from "../api/routeApi";
+
+import { getNearbyServices, saveEmergencyHistory } from "../api/emergencyApi";
+
+const MapPage = () => {
+  const { user } = useAuth();
+const [showSOSContacts, setShowSOSContacts] = useState(false);
+  const [searchParams] = useSearchParams();
+  const emergencyType = searchParams.get("type") || "medical";
+
+  const [userLocation, setUserLocation] = useState(null);
+  const [services, setServices] = useState([]);
+  const [selectedService, setSelectedService] = useState(null);
+  const [routeData, setRouteData] = useState(null);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+const [manualLocation, setManualLocation] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [sosLoading, setSOSLoading] = useState(false);
+
+const [manualMode, setManualMode] = useState(false);
+  const handleManualLocation = async () => {
+  try {
+    setManualMode(true);
+    const address = encodeURIComponent(manualLocation);
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${address}&format=json&limit=1`
+    );
+
+    const data = await response.json();
+
+    if (!data.length) {
+      alert("Location not found");
+      return;
+    }
+
+
+    const location = {
+      latitude: parseFloat(data[0].lat),
+      longitude: parseFloat(data[0].lon),
+      address: data[0].display_name,
+    };
+
+    setUserLocation(location);
+
+    setServices([]);
+    setRouteData(null);
+    setRouteCoordinates([]);
+
+    const nearbyResponse = await getNearbyServices({
+  latitude: location.latitude,
+  longitude: location.longitude,
+  emergencyType,
+  radius: 5000,
+});
+
+setServices(nearbyResponse.data.services || []);
+  } catch (error) {
+    alert("Failed to search location");
+  }
+};
+
+  const fetchCurrentLocation = async () => {
+    try {
+      setLocationLoading(true);
+
+      const location = await getCurrentLocation();
+
+      const address = await reverseGeocode(location.latitude, location.longitude);
+
+const currentLocation = {
+  latitude: location.latitude,
+  longitude: location.longitude,
+  address,
+};
+
+      console.log("CURRENT LOCATION:", currentLocation);
+
+      setUserLocation(currentLocation);
+    } catch (error) {
+      alert(
+        `${error}. Please allow location permission in browser and reload page.`
+      );
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+
+  const fetchNearby = async () => {
+    if (!userLocation) return;
+
+    try {
+      setLoading(true);
+      setSelectedService(null);
+      setRouteData(null);
+      setRouteCoordinates([]);
+
+      const response = await getNearbyServices({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        emergencyType,
+        radius: 15000,
+      });
+
+      setServices(response.data.services || []);
+    } catch (error) {
+      alert(error?.message || "Failed to fetch nearby services");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRoute = async (service) => {
+    try {
+      if (!userLocation) {
+        alert("Current location not found");
+        return;
+      }
+
+      setSelectedService(service);
+
+      const response = await getShortestRoute({
+        startLat: userLocation.latitude,
+        startLng: userLocation.longitude,
+        destinationLat: service.latitude,
+        destinationLng: service.longitude,
+      });
+
+      const route = response.data;
+      setRouteData(route);
+  await saveEmergencyHistory({
+  emergencyType,
+  userLocation: {
+    latitude: userLocation.latitude,
+    longitude: userLocation.longitude,
+    address: userLocation.address,
+  },
+  selectedService: {
+    name: service.name,
+    type: service.type,
+    latitude: service.latitude,
+    longitude: service.longitude,
+    address: service.address,
+    distanceKm: service.distanceKm,
+  },
+  routeDetails: {
+    distance: route.distanceKm,
+    eta: route.etaMinutes,
+  },
+});
+      if (route.geometry?.coordinates) {
+        const convertedCoordinates = route.geometry.coordinates.map(
+          ([lng, lat]) => [lat, lng]
+        );
+
+        setRouteCoordinates(convertedCoordinates);
+      }
+    } catch (error) {
+      alert(error?.message || "Failed to fetch route");
+    }
+  };
+
+ const handleSOS = () => {
+  if (!userLocation) {
+    alert("Current location not found");
+    return;
+  }
+
+  if (!user?.emergencyContacts?.length) {
+    alert("No emergency contacts found. Please add contacts in Profile.");
+    return;
+  }
+
+  setShowSOSContacts(true);
+};
+const sendWhatsAppToContact = (phone) => {
+  const cleanPhone = phone.replace(/\D/g, "");
+
+  const phoneWithCountryCode = cleanPhone.startsWith("91")
+    ? cleanPhone
+    : `91${cleanPhone}`;
+
+  const message = encodeURIComponent(
+    `🚨 Emergency Alert from RapidRescue
+
+I need immediate help.
+
+Current Location:
+https://www.google.com/maps?q=${userLocation.latitude},${userLocation.longitude}
+
+Address:
+${userLocation.address}`
+  );
+
+  window.open(
+    `https://wa.me/${phoneWithCountryCode}?text=${message}`,
+    "_blank"
+  );
+
+  setShowSOSContacts(false);
+};
+
+  useEffect(() => {
+    fetchCurrentLocation();
+  }, []);
+
+  useEffect(() => {
+     if (manualMode) return;
+  const watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      setUserLocation((prev) => ({
+        ...prev,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        address: prev?.address || "Live Location",
+      }));
+    },
+    (error) => {
+      console.log(error);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000,
+    }
+  );
+
+  return () => navigator.geolocation.clearWatch(watchId);
+}, [manualMode]);
+
+useEffect(() => {
+  if (userLocation) {
+    fetchNearby();
+  }
+}, [userLocation, emergencyType]);
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <section className="bg-white rounded-2xl shadow-md p-5 md:p-7 mb-6">
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-800 capitalize">
+            {emergencyType.replace("_", " ")} Assistance
+          </h1>
+
+          <p className="text-gray-600 mt-3 text-sm md:text-lg">
+            RapidRescue is using your live location to find nearby emergency
+            services.
+          </p>
+          <div className="mt-5 flex flex-col md:flex-row gap-3">
+  <input
+    type="text"
+    placeholder="Search location (e.g. Bhopal, Kurwai, MANIT)"
+    value={manualLocation}
+    onChange={(e) => setManualLocation(e.target.value)}
+    className="flex-1 border border-gray-300 rounded-xl px-4 py-3"
+  />
+
+  <button
+    onClick={handleManualLocation}
+    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold"
+  >
+    Search Location
+  </button>
+</div>
+
+          {userLocation && (
+         <p className="text-sm text-blue-600 font-semibold mt-3">
+  📍 {userLocation.address}
+</p>
+          )}
+        </section>
+
+        {routeData && selectedService && (
+          <section className="bg-white rounded-2xl shadow-md p-5 md:p-6 mb-6">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">
+              Route Details
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gray-50 rounded-xl p-4 border">
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                  <FaMapMarkerAlt />
+                  <span className="font-semibold">Destination</span>
+                </div>
+                <p className="font-bold text-gray-800">
+                  {selectedService.name}
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4 border">
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                  <FaRoute />
+                  <span className="font-semibold">Distance</span>
+                </div>
+                <p className="font-bold text-gray-800">
+                  {routeData.distanceKm} km
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4 border">
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                  <FaClock />
+                  <span className="font-semibold">ETA</span>
+                </div>
+                <p className="font-bold text-gray-800">
+                  {routeData.etaMinutes} min
+                </p>
+              </div>
+            </div>
+          </section>
+           )}
+
+       
+
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="w-full lg:w-2/3">
+            {locationLoading ? (
+              <div className="h-[350px] md:h-[500px] bg-white rounded-2xl shadow-md flex items-center justify-center">
+                <p className="text-gray-600 font-semibold">
+                  Getting your live location...
+                </p>
+              </div>
+            ) : (
+              <MapComponent
+                userLocation={userLocation}
+                services={services}
+                routeCoordinates={routeCoordinates}
+                selectedService={selectedService}
+              />
+            )}
+          </div>
+
+          <div className="w-full lg:w-1/3">
+            <div className="bg-white rounded-2xl shadow-md p-5 md:p-6">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-5">
+                Nearby Services
+              </h2>
+
+              {loading ? (
+                <p className="text-gray-500">Loading nearby services...</p>
+              ) : services.length === 0 ? (
+                <p className="text-gray-500">No nearby services found.</p>
+              ) : (
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                  {services.map((service) => (
+                    <ServiceCard
+  key={service.id}
+  service={service}
+  onRouteClick={handleRoute}
+/>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <SOSButton onClick={handleSOS} loading={sosLoading} />
+      {showSOSContacts && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[2000] px-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">
+        Select Emergency Contact
+      </h2>
+
+      <p className="text-gray-600 mb-5">
+        Choose a contact to send SOS on WhatsApp.
+      </p>
+
+      <div className="space-y-3 max-h-[350px] overflow-y-auto">
+       {user?.emergencyContacts?.map((contact) => (
+          <button
+            key={contact._id}
+            onClick={() => sendWhatsAppToContact(contact.phone)}
+            className="w-full text-left border rounded-xl p-4 hover:bg-green-50 hover:border-green-500 transition"
+          >
+            <h3 className="font-bold text-gray-800">
+              {contact.name}
+            </h3>
+
+            <p className="text-sm text-gray-500">
+              {contact.relation || "Emergency Contact"}
+            </p>
+
+            <p className="text-green-600 font-semibold mt-1">
+              {contact.phone}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setShowSOSContacts(false)}
+        className="mt-5 w-full bg-gray-800 hover:bg-gray-900 text-white py-3 rounded-xl font-bold"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+    </div>
+  );
+  
+};
+
+export default MapPage;

@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# production build
+dist/
+
+# environment variables
+.env
+
+# logs
+*.log
+
+# editor folders
+.vscode/
+.idea/
+
+# operating system files
+.DS_Store
+Thumbs.db
+
+# cache
+.cache/
+.eslintcache
+
+# Vite
+vite.config.timestamp-*
