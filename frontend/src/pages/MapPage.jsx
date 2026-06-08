@@ -14,23 +14,54 @@ import { getNearbyServices, saveEmergencyHistory } from "../api/emergencyApi";
 
 const MapPage = () => {
   const { user } = useAuth();
-
   const [searchParams] = useSearchParams();
   const emergencyType = searchParams.get("type") || "medical";
 
   const [showSOSContacts, setShowSOSContacts] = useState(false);
   const [error, setError] = useState("");
-
   const [userLocation, setUserLocation] = useState(null);
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [routeData, setRouteData] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
-
   const [manualLocation, setManualLocation] = useState("");
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(true);
-  const [sosLoading, setSOSLoading] = useState(false);
+  const [sosLoading] = useState(false);
+
+  const searchLocationByName = async (query) => {
+    const searches = [
+      query,
+      `${query}, Bhopal`,
+      `${query}, Madhya Pradesh`,
+      `${query}, India`,
+    ];
+
+    for (const searchText of searches) {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          searchText
+        )}&format=json&limit=5&countrycodes=in&addressdetails=1`
+      );
+
+      const data = await response.json();
+
+      if (data?.length > 0) {
+        const bestResult =
+          data.find((item) =>
+            item.display_name.toLowerCase().includes(query.toLowerCase())
+          ) || data[0];
+
+        return {
+          latitude: parseFloat(bestResult.lat),
+          longitude: parseFloat(bestResult.lon),
+          address: bestResult.display_name,
+        };
+      }
+    }
+
+    return null;
+  };
 
   const fetchNearbyForLocation = async (location) => {
     try {
@@ -41,26 +72,34 @@ const MapPage = () => {
       setRouteCoordinates([]);
       setServices([]);
 
-      const response = await getNearbyServices({
-        latitude: location.latitude,
-        longitude: location.longitude,
-        emergencyType,
-        radius: 5000,
-      });
+      const radiusList = [5000, 10000, 20000, 50000];
+      let fetchedServices = [];
 
-      const fetchedServices = response.data.services || [];
+      for (const radius of radiusList) {
+        const response = await getNearbyServices({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          emergencyType,
+          radius,
+        });
+
+        fetchedServices = response.data.services || [];
+
+        if (fetchedServices.length > 0) break;
+      }
+
       setServices(fetchedServices);
 
       if (fetchedServices.length === 0) {
         setError(
-          "No nearby services found for this location. Try another location or emergency type."
+          "No nearby services found even in a larger area. Try another emergency type or a nearby city/landmark."
         );
       }
     } catch (error) {
       console.error(error);
       setServices([]);
       setError(
-        "Unable to find nearby services. Try manual location search or another emergency type."
+        "Unable to find nearby services. Please check internet/backend and try again."
       );
     } finally {
       setLoading(false);
@@ -74,10 +113,12 @@ const MapPage = () => {
 
       const location = await getCurrentLocation();
 
-      const address = await reverseGeocode(
-        location.latitude,
-        location.longitude
-      );
+      let address = "Current Location";
+      try {
+        address = await reverseGeocode(location.latitude, location.longitude);
+      } catch {
+        address = `${location.latitude}, ${location.longitude}`;
+      }
 
       const currentLocation = {
         latitude: location.latitude,
@@ -88,6 +129,7 @@ const MapPage = () => {
       setUserLocation(currentLocation);
       await fetchNearbyForLocation(currentLocation);
     } catch (error) {
+      console.error(error);
       setError(
         "Location permission denied or location unavailable. Please search location manually."
       );
@@ -105,25 +147,17 @@ const MapPage = () => {
 
       setError("");
       setLocationLoading(true);
+      setServices([]);
+      setSelectedService(null);
+      setRouteData(null);
+      setRouteCoordinates([]);
 
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-          manualLocation
-        )}&format=json&limit=1`
-      );
+      const location = await searchLocationByName(manualLocation.trim());
 
-      const data = await response.json();
-
-      if (!data.length) {
-        setError("Location not found. Try a more specific location.");
+      if (!location) {
+        setError("Location not found. Try writing city/state also.");
         return;
       }
-
-      const location = {
-        latitude: parseFloat(data[0].lat),
-        longitude: parseFloat(data[0].lon),
-        address: data[0].display_name,
-      };
 
       setUserLocation(location);
       await fetchNearbyForLocation(location);
@@ -155,26 +189,30 @@ const MapPage = () => {
       const route = response.data;
       setRouteData(route);
 
-      await saveEmergencyHistory({
-        emergencyType,
-        userLocation: {
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          address: userLocation.address,
-        },
-        selectedService: {
-          name: service.name,
-          type: service.type,
-          latitude: service.latitude,
-          longitude: service.longitude,
-          address: service.address,
-          distanceKm: service.distanceKm,
-        },
-        routeDetails: {
-          distance: route.distanceKm,
-          eta: route.etaMinutes,
-        },
-      });
+      try {
+        await saveEmergencyHistory({
+          emergencyType,
+          userLocation: {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            address: userLocation.address,
+          },
+          selectedService: {
+            name: service.name,
+            type: service.type,
+            latitude: service.latitude,
+            longitude: service.longitude,
+            address: service.address,
+            distanceKm: service.distanceKm,
+          },
+          routeDetails: {
+            distance: route.distanceKm,
+            eta: route.etaMinutes,
+          },
+        });
+      } catch (historyError) {
+        console.error("History save failed:", historyError);
+      }
 
       if (route.geometry?.coordinates) {
         const convertedCoordinates = route.geometry.coordinates.map(
@@ -258,18 +296,21 @@ ${userLocation.address}`
           <div className="mt-5 flex flex-col md:flex-row gap-3">
             <input
               type="text"
-              placeholder="Search location (e.g. MANIT Bhopal, Bhopal Railway Station)"
+              placeholder="Search location e.g. MANIT Bhopal, Raisen MP, Sehore MP"
               value={manualLocation}
               onChange={(e) => setManualLocation(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleManualLocation();
+              }}
               className="flex-1 border border-gray-300 rounded-xl px-4 py-3"
             />
 
             <button
               onClick={handleManualLocation}
-              disabled={locationLoading}
+              disabled={locationLoading || loading}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold"
             >
-              Search Location
+              {locationLoading ? "Searching..." : "Search Location"}
             </button>
           </div>
 
@@ -331,7 +372,7 @@ ${userLocation.address}`
             {locationLoading ? (
               <div className="h-[350px] md:h-[500px] bg-white rounded-2xl shadow-md flex items-center justify-center">
                 <p className="text-gray-600 font-semibold">
-                  Getting your location...
+                  Searching location...
                 </p>
               </div>
             ) : (
@@ -351,16 +392,18 @@ ${userLocation.address}`
               </h2>
 
               {loading ? (
-                <p className="text-gray-500">Loading nearby services...</p>
+                <p className="text-gray-500">
+                  Searching nearby services in larger area...
+                </p>
               ) : services.length === 0 ? (
                 <p className="text-gray-500">
-                  No nearby services found. Try manual location search.
+                  No nearby services found. Try a nearby city or landmark.
                 </p>
               ) : (
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
                   {services.map((service) => (
                     <ServiceCard
-                      key={service.id}
+                      key={service.id || `${service.name}-${service.latitude}`}
                       service={service}
                       onRouteClick={handleRoute}
                     />
@@ -388,7 +431,7 @@ ${userLocation.address}`
             <div className="space-y-3 max-h-[350px] overflow-y-auto">
               {user?.emergencyContacts?.map((contact) => (
                 <button
-                  key={contact._id}
+                  key={contact._id || contact.phone}
                   onClick={() => sendWhatsAppToContact(contact.phone)}
                   className="w-full text-left border rounded-xl p-4 hover:bg-green-50 hover:border-green-500 transition"
                 >
