@@ -19,7 +19,7 @@ const MapPage = () => {
 const [showSOSContacts, setShowSOSContacts] = useState(false);
   const [searchParams] = useSearchParams();
   const emergencyType = searchParams.get("type") || "medical";
-
+const [error, setError] = useState("");
   const [userLocation, setUserLocation] = useState(null);
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
@@ -69,7 +69,7 @@ const [manualMode, setManualMode] = useState(false);
 
 setServices(nearbyResponse.data.services || []);
   } catch (error) {
-    alert("Failed to search location");
+   setError("Failed to search location");
   }
 };
 
@@ -91,9 +91,9 @@ const currentLocation = {
 
       setUserLocation(currentLocation);
     } catch (error) {
-      alert(
-        `${error}. Please allow location permission in browser and reload page.`
-      );
+      setError(
+  "Location permission denied. Please allow location access and refresh."
+);
     } finally {
       setLocationLoading(false);
     }
@@ -104,6 +104,7 @@ const currentLocation = {
     if (!userLocation) return;
 
     try {
+      setError("");
       setLoading(true);
       setSelectedService(null);
       setRouteData(null);
@@ -113,13 +114,17 @@ const currentLocation = {
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
         emergencyType,
-        radius: 15000,
+        radius: 5000,
       });
 
       setServices(response.data.services || []);
     } catch (error) {
-      alert(error?.message || "Failed to fetch nearby services");
-    } finally {
+  console.error(error);
+
+  setError(
+    "Unable to find nearby services. Try another location or check your internet connection."
+  );
+} finally {
       setLoading(false);
     }
   };
@@ -170,7 +175,7 @@ const currentLocation = {
         setRouteCoordinates(convertedCoordinates);
       }
     } catch (error) {
-      alert(error?.message || "Failed to fetch route");
+      setError("Unable to generate route.");
     }
   };
 
@@ -279,9 +284,16 @@ useEffect(() => {
 </div>
 
           {userLocation && (
+            <>
          <p className="text-sm text-blue-600 font-semibold mt-3">
   📍 {userLocation.address}
 </p>
+{error && (
+  <div className="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
+    {error}
+  </div>
+)}
+</>
           )}
         </section>
 
