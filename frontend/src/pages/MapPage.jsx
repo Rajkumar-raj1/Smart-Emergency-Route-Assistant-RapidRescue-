@@ -63,48 +63,40 @@ const MapPage = () => {
     return null;
   };
 
-  const fetchNearbyForLocation = async (location) => {
-    try {
-      setError("");
-      setLoading(true);
-      setSelectedService(null);
-      setRouteData(null);
-      setRouteCoordinates([]);
-      setServices([]);
+ const fetchNearbyForLocation = async (location) => {
+  try {
+    setError("");
+    setLoading(true);
+    setSelectedService(null);
+    setRouteData(null);
+    setRouteCoordinates([]);
+    setServices([]);
 
-      const radiusList = [5000, 10000, 20000, 50000];
-      let fetchedServices = [];
+    const response = await getNearbyServices({
+      latitude: location.latitude,
+      longitude: location.longitude,
+      emergencyType,
+      radius: 5000,
+    });
 
-      for (const radius of radiusList) {
-        const response = await getNearbyServices({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          emergencyType,
-          radius,
-        });
+    const fetchedServices = response.data.services || [];
+    setServices(fetchedServices);
 
-        fetchedServices = response.data.services || [];
-
-        if (fetchedServices.length > 0) break;
-      }
-
-      setServices(fetchedServices);
-
-      if (fetchedServices.length === 0) {
-        setError(
-          "No nearby services found even in a larger area. Try another emergency type or a nearby city/landmark."
-        );
-      }
-    } catch (error) {
-      console.error(error);
-      setServices([]);
+    if (fetchedServices.length === 0) {
       setError(
-        "Unable to find nearby services. Please check internet/backend and try again."
+        "No nearby services found even in a larger area. Try another emergency type or a nearby city/landmark."
       );
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error(error);
+    setServices([]);
+    setError(
+      "Unable to find nearby services. Please check internet/backend and try again."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchCurrentLocation = async () => {
     try {

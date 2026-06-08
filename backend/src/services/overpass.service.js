@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const OVERPASS_URLS = [
-  "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
   "https://overpass.openstreetmap.ru/api/interpreter",
 ];
 
@@ -67,12 +67,76 @@ const buildOverpassQuery = (latitude, longitude, emergencyType, radius) => {
     .replaceAll("LNG", longitude);
 
   return `
-[out:json][timeout:25];
+[out:json][timeout:12];
 (
 ${finalQueryPart}
 );
 out center tags;
 `;
+};
+
+const fetchFromOverpass = async (
+  url,
+  latitude,
+  longitude,
+  emergencyType,
+  radius
+) => {
+  const query = buildOverpassQuery(latitude, longitude, emergencyType, radius);
+
+  const response = await axios.post(
+    url,
+    new URLSearchParams({ data: query }).toString(),
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "RapidRescue/1.0",
+      },
+      timeout: 12000,
+    }
+  );
+
+  return response.data.elements || [];
+};
+
+const formatServices = (elements, latitude, longitude, emergencyType) => {
+  const uniqueMap = new Map();
+
+  elements.forEach((place) => {
+    const lat = place.lat || place.center?.lat;
+    const lng = place.lon || place.center?.lon;
+
+    if (!lat || !lng) return;
+
+    const id = `${place.type}-${place.id}`;
+    if (uniqueMap.has(id)) return;
+
+    const distanceKm = getDistanceKm(
+      Number(latitude),
+      Number(longitude),
+      Number(lat),
+      Number(lng)
+    );
+
+    uniqueMap.set(id, {
+      id,
+      name: place.tags?.name || "Unknown Service",
+      type: emergencyType,
+      latitude: lat,
+      longitude: lng,
+      distanceKm: Number(distanceKm.toFixed(2)),
+      address:
+        place.tags?.["addr:full"] ||
+        place.tags?.["addr:street"] ||
+        place.tags?.["addr:city"] ||
+        place.tags?.operator ||
+        "Address not available",
+    });
+  });
+
+  return Array.from(uniqueMap.values()).sort(
+    (a, b) => a.distanceKm - b.distanceKm
+  );
 };
 
 const fetchNearbyServices = async (
@@ -82,77 +146,34 @@ const fetchNearbyServices = async (
   radius = 5000
 ) => {
   const radiusList = [Number(radius), 10000, 20000, 50000];
-  let lastError = null;
 
-  for (const currentRadius of radiusList) {
-    const query = buildOverpassQuery(
-      latitude,
-      longitude,
-      emergencyType,
-      currentRadius
-    );
+  const requests = [];
 
-    for (const url of OVERPASS_URLS) {
-      try {
-        const response = await axios.post(
+  radiusList.forEach((currentRadius) => {
+    OVERPASS_URLS.forEach((url) => {
+      requests.push(
+        fetchFromOverpass(
           url,
-          new URLSearchParams({ data: query }).toString(),
-          {
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "User-Agent": "RapidRescue/1.0",
-            },
-            timeout: 30000,
-          }
-        );
+          latitude,
+          longitude,
+          emergencyType,
+          currentRadius
+        )
+      );
+    });
+  });
 
-        const services = (response.data.elements || [])
-          .map((place) => {
-            const lat = place.lat || place.center?.lat;
-            const lng = place.lon || place.center?.lon;
+  const results = await Promise.allSettled(requests);
 
-            if (!lat || !lng) return null;
+  const allElements = results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => result.value);
 
-            const distanceKm = getDistanceKm(
-              Number(latitude),
-              Number(longitude),
-              Number(lat),
-              Number(lng)
-            );
-
-            return {
-              id: `${place.type}-${place.id}`,
-              name: place.tags?.name || "Unknown Service",
-              type: emergencyType,
-              latitude: lat,
-              longitude: lng,
-              distanceKm: Number(distanceKm.toFixed(2)),
-              address:
-                place.tags?.["addr:full"] ||
-                place.tags?.["addr:street"] ||
-                place.tags?.["addr:city"] ||
-                place.tags?.operator ||
-                "Address not available",
-            };
-          })
-          .filter(Boolean)
-          .sort((a, b) => a.distanceKm - b.distanceKm);
-
-        if (services.length > 0) {
-          return services;
-        }
-      } catch (error) {
-        lastError = error;
-        console.log(`Overpass failed: ${url}`);
-      }
-    }
+  if (allElements.length === 0) {
+    return [];
   }
 
-  if (lastError) {
-    throw lastError;
-  }
-
-  return [];
+  return formatServices(allElements, latitude, longitude, emergencyType);
 };
 
 export { fetchNearbyServices };
