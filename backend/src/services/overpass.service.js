@@ -147,33 +147,37 @@ const fetchNearbyServices = async (
 ) => {
   const radiusList = [Number(radius), 10000, 20000, 50000];
 
-  const requests = [];
+  let lastError = null;
 
-  radiusList.forEach((currentRadius) => {
-    OVERPASS_URLS.forEach((url) => {
-      requests.push(
-        fetchFromOverpass(
-          url,
-          latitude,
-          longitude,
-          emergencyType,
-          currentRadius
-        )
-      );
-    });
-  });
+  for (const currentRadius of radiusList) {
+    const requests = OVERPASS_URLS.map((url) =>
+      fetchFromOverpass(
+        url,
+        latitude,
+        longitude,
+        emergencyType,
+        currentRadius
+      )
+    );
 
-  const results = await Promise.allSettled(requests);
+    const results = await Promise.allSettled(requests);
 
-  const allElements = results
-    .filter((result) => result.status === "fulfilled")
-    .flatMap((result) => result.value);
+    const allElements = results
+      .filter((result) => result.status === "fulfilled")
+      .flatMap((result) => result.value);
 
-  if (allElements.length === 0) {
-    return [];
+    if (allElements.length > 0) {
+      return formatServices(allElements, latitude, longitude, emergencyType);
+    }
+
+    const failedResult = results.find((result) => result.status === "rejected");
+    if (failedResult) {
+      lastError = failedResult.reason;
+    }
   }
 
-  return formatServices(allElements, latitude, longitude, emergencyType);
+  console.log("No services found after all radius checks", lastError?.message);
+  return [];
 };
 
 export { fetchNearbyServices };
