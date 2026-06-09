@@ -3,7 +3,7 @@ import axios from "axios";
 const OVERPASS_URLS = [
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter",
-  // "https://overpass.openstreetmap.ru/api/interpreter",
+  "https://overpass.openstreetmap.ru/api/interpreter",
 ];
 
 const emergencyTypeQueries = {
@@ -145,33 +145,31 @@ const fetchNearbyServices = async (
   emergencyType,
   radius = 5000
 ) => {
-  const radiusList = [Number(radius), 10000, 20000, 50000];
+  const radiusList = [5000, 10000, 20000, 40000, 50000];
   let lastError = null;
 
   for (const currentRadius of radiusList) {
-    const requests = OVERPASS_URLS.map((url) =>
-      fetchFromOverpass(
-        url,
-        latitude,
-        longitude,
-        emergencyType,
-        currentRadius
-      )
-    );
+    for (const url of OVERPASS_URLS) {
+      try {
+        const elements = await fetchFromOverpass(
+          url,
+          latitude,
+          longitude,
+          emergencyType,
+          currentRadius,
+          true
+        );
 
-    const results = await Promise.allSettled(requests);
-
-    const allElements = results
-      .filter((result) => result.status === "fulfilled")
-      .flatMap((result) => result.value);
-
-    if (allElements.length > 0) {
-      return formatServices(allElements, latitude, longitude, emergencyType);
-    }
-
-    const failedResult = results.find((result) => result.status === "rejected");
-    if (failedResult) {
-      lastError = failedResult.reason;
+        if (elements.length > 0) {
+          return formatServices(elements, latitude, longitude, emergencyType);
+        }
+      } catch (error) {
+        lastError = error;
+        console.log(
+          `Overpass failed: ${url}, radius: ${currentRadius}`,
+          error.message
+        );
+      }
     }
   }
 
