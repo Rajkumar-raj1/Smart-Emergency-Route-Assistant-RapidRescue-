@@ -79,20 +79,18 @@ const MapPage = () => {
       radius: 5000,
     });
 
-    const fetchedServices = response.data.services || [];
+    const fetchedServices = response.data?.services || [];
     setServices(fetchedServices);
 
     if (fetchedServices.length === 0) {
       setError(
-        "No nearby services found even in a larger area. Try another emergency type or a nearby city/landmark."
+        "No nearby services found. Try another emergency type or nearby city/landmark."
       );
     }
   } catch (error) {
     console.error(error);
     setServices([]);
-    setError(
-      "Unable to find nearby services. Please check internet/backend and try again."
-    );
+    setError("Unable to find nearby services. Please try again.");
   } finally {
     setLoading(false);
   }

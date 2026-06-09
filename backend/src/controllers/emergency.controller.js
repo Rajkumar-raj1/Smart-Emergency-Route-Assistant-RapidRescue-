@@ -6,7 +6,31 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const getNearbyServices = asyncHandler(async (req, res) => {
-  const { latitude, longitude, emergencyType, radius } = req.query;
+ let { latitude, longitude, emergencyType, radius } = req.query;
+
+const typeMap = {
+  medical: "medical",
+  hospital: "medical",
+  ambulance: "medical",
+  clinic: "medical",
+  doctor: "medical",
+
+  police: "police",
+
+  fuel: "fuel",
+  petrol: "fuel",
+
+  fire: "fire",
+
+  pharmacy: "pharmacy",
+  medicine: "pharmacy",
+
+  breakdown: "car_breakdown",
+  car_breakdown: "car_breakdown",
+  mechanic: "car_breakdown",
+};
+
+emergencyType = typeMap[emergencyType] || emergencyType;
 
   if (
     latitude === undefined ||

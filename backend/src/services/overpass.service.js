@@ -3,7 +3,7 @@ import axios from "axios";
 const OVERPASS_URLS = [
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
+  // "https://overpass.openstreetmap.ru/api/interpreter",
 ];
 
 const emergencyTypeQueries = {
@@ -146,7 +146,6 @@ const fetchNearbyServices = async (
   radius = 5000
 ) => {
   const radiusList = [Number(radius), 10000, 20000, 50000];
-
   let lastError = null;
 
   for (const currentRadius of radiusList) {
@@ -176,8 +175,7 @@ const fetchNearbyServices = async (
     }
   }
 
-  console.log("No services found after all radius checks", lastError?.message);
+  console.log("No services found:", lastError?.message);
   return [];
 };
-
 export { fetchNearbyServices };
