@@ -145,31 +145,26 @@ const fetchNearbyServices = async (
   emergencyType,
   radius = 5000
 ) => {
-  const radiusList = [5000, 10000, 20000, 40000, 50000];
+  const currentRadius = 5000;
   let lastError = null;
 
-  for (const currentRadius of radiusList) {
-    for (const url of OVERPASS_URLS) {
-      try {
-        const elements = await fetchFromOverpass(
-          url,
-          latitude,
-          longitude,
-          emergencyType,
-          currentRadius,
-          true
-        );
+  for (const url of OVERPASS_URLS) {
+    try {
+      const elements = await fetchFromOverpass(
+        url,
+        latitude,
+        longitude,
+        emergencyType,
+        currentRadius,
+        true
+      );
 
-        if (elements.length > 0) {
-          return formatServices(elements, latitude, longitude, emergencyType);
-        }
-      } catch (error) {
-        lastError = error;
-        console.log(
-          `Overpass failed: ${url}, radius: ${currentRadius}`,
-          error.message
-        );
+      if (elements.length > 0) {
+        return formatServices(elements, latitude, longitude, emergencyType);
       }
+    } catch (error) {
+      lastError = error;
+      console.log(`Overpass failed: ${url}`, error.message);
     }
   }
 
