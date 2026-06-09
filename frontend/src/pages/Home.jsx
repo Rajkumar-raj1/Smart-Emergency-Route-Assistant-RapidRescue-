@@ -24,31 +24,45 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <nav className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center">
-              <FaShieldAlt />
-            </div>
-            <h1 className="text-2xl font-bold">RapidRescue</h1>
-          </div>
-
-          <div className="hidden md:flex  gap-8 font-semibold text-slate-700">
-            <a href="#home" className="text-blue-600">Home</a>
-            <a href="#features">Features</a>
-            
-          </div>
-
-          <div className="flex gap-3">
-            <Link to="/login" className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg font-semibold">
-              Login
-            </Link>
-            <Link to="/register" className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold">
-              Create Account
-            </Link>
-          </div>
+     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
+  <div className="max-w-7xl mx-auto px-4 sm:px-5 py-4">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="bg-blue-600 text-white w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0">
+          <FaShieldAlt />
         </div>
-      </nav>
+
+        <h1 className="text-xl sm:text-2xl font-bold truncate">
+          RapidRescue
+        </h1>
+      </div>
+
+      <div className="hidden md:flex gap-8 font-semibold text-slate-700">
+        <a href="#home" className="text-blue-600">
+          Home
+        </a>
+        <a href="#features">Features</a>
+      </div>
+
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <Link
+          to="/login"
+          className="px-3 sm:px-4 py-2 border border-blue-600 text-blue-600 rounded-lg text-sm sm:text-base font-semibold"
+        >
+          Login
+        </Link>
+
+        <Link
+          to="/register"
+          className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg text-sm sm:text-base font-semibold whitespace-nowrap"
+        >
+          <span className="hidden sm:inline">Create Account</span>
+          <span className="sm:hidden">Sign Up</span>
+        </Link>
+      </div>
+    </div>
+  </div>
+</nav>
 
       <section id="home" className="bg-gradient-to-br from-blue-50 to-white">
         <div className="max-w-7xl mx-auto px-5 py-14 md:py-20 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
