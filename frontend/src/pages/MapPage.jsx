@@ -76,7 +76,7 @@ const MapPage = () => {
       latitude: location.latitude,
       longitude: location.longitude,
       emergencyType,
-      radius: 5000,
+      radius: 10000,
     });
 
     const fetchedServices = response.data?.services || [];
