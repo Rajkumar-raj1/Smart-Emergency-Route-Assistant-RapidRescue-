@@ -1,6 +1,14 @@
 # 🚑 RapidRescue - Smart Emergency Route Assistant
 
-RapidRescue is a full-stack MERN application designed to assist users during emergencies by locating nearby emergency services, generating optimal routes, managing emergency contacts, and sending SOS alerts with location details.
+RapidRescue is a full-stack MERN application that helps users during emergencies by locating nearby emergency services, generating optimal routes, managing emergency contacts, and sending SOS alerts with live location details.
+
+## 🌐 Live Demo
+
+**Frontend:** https://smart-emergency-route-assistant-rap.vercel.app/
+
+**Backend API:** https://smart-emergency-route-assistant.onrender.com
+
+---
 
 ## ✨ Features
 
@@ -13,9 +21,9 @@ RapidRescue is a full-stack MERN application designed to assist users during eme
 
 ### 🚨 Emergency Assistance
 
-* Medical Emergency
+* Medical Emergency Support
 * Police Assistance
-* Fire Emergency
+* Fire Emergency Support
 * Fuel Station Finder
 * Vehicle Breakdown Assistance
 * Pharmacy Search
@@ -27,13 +35,14 @@ RapidRescue is a full-stack MERN application designed to assist users during eme
 * Nearby Emergency Service Discovery
 * Interactive Maps using Leaflet & OpenStreetMap
 * Shortest Route Generation using OSRM
+* Distance & ETA Calculation
 
 ### 🚗 Multi-Stop Route Optimization
 
-* Select Multiple Emergency Destinations
-* Dijkstra Algorithm Based Optimization
-* Optimized Emergency Journey Planning
-* Distance and ETA Calculation
+* Multiple Emergency Destination Selection
+* Dijkstra Algorithm-Based Optimization
+* Emergency Journey Planning
+* Route Distance & Time Estimation
 
 ### 📱 SOS System
 
@@ -74,6 +83,7 @@ RapidRescue is a full-stack MERN application designed to assist users during eme
 
 * OpenStreetMap
 * Nominatim API
+* Overpass API
 * OSRM Routing API
 
 ---
@@ -97,7 +107,6 @@ Used for:
 * ETA estimation
 * Route visualization
 
----
 
 ## 📂 Project Structure
 
@@ -169,7 +178,11 @@ npm run dev
 ## 👨‍💻 Author
 
 **Raj Kumar Lodhi**
+
 Electronics & Communication Engineering
+
 MANIT Bhopal
 
 GitHub: https://github.com/Rajkumar-raj1
+
+LinkedIn: https://www.linkedin.com/in/raj-lodhi-313809290
