@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const OVERPASS_URLS = [
-  "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
+  "https://lz4.overpass-api.de/api/interpreter",
+  "https://z.overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
 ];
 
 const emergencyTypeQueries = {
